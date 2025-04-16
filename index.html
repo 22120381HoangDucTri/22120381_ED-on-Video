@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<title>22120381 - Edge Detection on Video</title>
+<head>
+    <script lang="javascript">
+        document.addEventListener("DOMContentLoaded", function () {
+            var video = document.getElementById("video");
+            var canvas = document.getElementById("canvas");
+            var context = canvas.getContext("2d");
+
+            video.addEventListener("canplay", function () {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+
+                var hiddenCanvas = document.getElementById("hidden");
+                hiddenCanvas.width = video.videoWidth;
+                hiddenCanvas.height = video.videoHeight;
+            });
+
+            video.addEventListener("play", function () {
+                drawEdge(video, context, video.videoWidth, video.videoHeight);
+            }, false);
+        });
+
+        function drawEdge(video, context, width, height) {
+            console.log("drawEdge called");
+            console.log("Video dimensions:", width, height);
+
+            if (video.paused || video.ended) return false;
+
+            // Get frame from video
+            var frame = document.getElementById("hidden");
+            var ctx = frame.getContext("2d");
+            ctx.drawImage(video, 0, 0, width, height);
+
+            var frameData = ctx.getImageData(0, 0, width, height);
+            console.log("Frame data length:", frameData.data.length);
+
+            var data = frameData.data;
+
+            // Convert to grayscale inplace
+            for (var i = 0; i < data.length; i += 4) {
+                var avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+                data[i] = avg;
+                data[i + 1] = avg;
+                data[i + 2] = avg;
+            }
+
+            // Do edge detection using Sobel filter
+            var sobel = [
+                [-1, 0, 1],
+                [-2, 0, 2],
+                [-1, 0, 1]
+            ];
+            var thresh = 90; // Threshold for edge detection
+            var dst = new Uint8ClampedArray(data.length);
+
+            for (var y = 1; y < height - 1; y++) {
+                for (var x = 1; x < width - 1; x++) {
+                    var gx = 0, gy = 0;
+
+                    for (var j = -1; j <= 1; j++) {
+                        for (var k = -1; k <= 1; k++) {
+                            var index = ((y + j) * width + (x + k)) * 4;
+                            var gray = data[index];
+                            gx += sobel[j + 1][k + 1] * gray;
+                            gy += sobel[k + 1][j + 1] * gray;
+                        }
+                    }
+
+                    var g = Math.sqrt(gx * gx + gy * gy);
+                    var edgeValue = g > thresh ? 255 : 0;
+
+                    var dstIndex = (y * width + x) * 4;
+                    dst[dstIndex] = edgeValue;
+                    dst[dstIndex + 1] = edgeValue;
+                    dst[dstIndex + 2] = edgeValue;
+                    dst[dstIndex + 3] = 255;
+                }
+            }
+
+            var outputImage = new ImageData(dst, width, height);
+            context.putImageData(outputImage, 0, 0);
+
+            setTimeout(drawEdge, 5, video, context, width, height);
+        }
+    </script>
+</head>
+<body>
+    <!-- Free video in courtesy of Blender Institute -->
+    <video id="video" src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" type="video/mp4" controls crossorigin="anonymous"></video>
+    <canvas id="canvas"></canvas>
+    <canvas id="hidden" style="display: none;"></canvas>
+</body>
+<style>
+    body {
+        background:white;
+        display: flex;
+        margin: 0;
+    }
+
+    #video, #canvas {
+        flex: 1;
+        width: 50%;
+        height: auto;
+        background-color:darkgray;
+    }
+</style>
